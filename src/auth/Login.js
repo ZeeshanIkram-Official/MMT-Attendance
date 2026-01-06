@@ -71,7 +71,7 @@ const Login = ({ navigation }) => {
       if (student && token) {
         await AsyncStorage.setItem('authToken', token);
         await AsyncStorage.setItem('userData', JSON.stringify(student));
-        navigation.replace('ProfileScreen');
+        navigation.replace('HomeScreen');
       } else {
         Alert.alert('Login Failed', response.data.message || 'User or token not found');
       }

@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   refreshButtonText: { color: '#fff', fontWeight: '600' },
   profileCard: { margin: 16, borderRadius: 16, paddingVertical: 30, alignItems: 'center', elevation: 3 },
   imageContainer: { position: 'relative' },
-  profileImage: {width: 150, height: 150, borderRadius: 75, borderWidth: 5, borderColor: '#f8fafc',
+  profileImage: {width: 150, height: 150, borderRadius: 75, borderWidth: 1, borderColor: '#f8fafc',
    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 12,},
   activeBadge: {position: 'absolute', bottom: 4, alignSelf: 'center', backgroundColor: '#22c55e',
    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, borderColor: '#fff', borderWidth: 2,},
