@@ -234,12 +234,12 @@ const Login = ({ navigation }) => {
         </View>
       </View>
 
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={styles.forgetContainer}
         onPress={() => navigation.navigate('ForgetPasswordScreen')}
       >
         <Text style={[styles.forgetText, { color: '#0087ff' }]}>Forgot Password ?</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       <TouchableOpacity
         style={[
@@ -274,7 +274,7 @@ const Login = ({ navigation }) => {
         />
       </View>
 
-      <TouchableOpacity
+      <View
         style={[
           styles.socialButton,
           {
@@ -292,8 +292,8 @@ const Login = ({ navigation }) => {
         >
           Google
         </Text>
-      </TouchableOpacity>
-
+      </View>
+{/* 
       <View style={styles.registerContainer}>
         <Text style={[styles.noAccount, { color: isDark ? '#aaa' : '#888' }]}>
           Didn’t have an account?
@@ -301,7 +301,7 @@ const Login = ({ navigation }) => {
         <TouchableOpacity>
           <Text style={styles.registerLink}> Register</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </ScrollView>
   );
 };
