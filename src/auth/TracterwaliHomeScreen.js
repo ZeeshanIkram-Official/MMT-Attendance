@@ -10,27 +10,24 @@ import {
   Modal,
   TextInput,
   RefreshControl,
+  KeyboardAvoidingView,
   Platform,
   Dimensions,
   Animated,
   PermissionsAndroid,
-  useColorScheme,
-
+  useColorScheme
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Geolocation from 'react-native-geolocation-service';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
- const targetLat = 28.41482550165086;
+const targetLat = 28.41482550165086;
 const targetLng = 70.305432536986;
-// Test k lia //
-// const targetLat = 28.42224990676678;
-// const targetLng = 70.31447411217071;
-
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3;
   const φ1 = (lat1 * Math.PI) / 180;
@@ -71,21 +68,6 @@ const requestLocationPermission = async () => {
     }
   }
 };
-
-const getCurrentLocation = () => {
-  return new Promise((resolve, reject) => {
-    Geolocation.getCurrentPosition(
-      (position) => resolve(position),
-      (error) => reject(error),
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 10000,
-      }
-    );
-  });
-};
-
 const requestCameraPermission = async () => {
   if (Platform.OS === 'android') {
     try {
@@ -107,14 +89,27 @@ const requestCameraPermission = async () => {
   }
   return true;
 };
-
-const HomeScreen = ({ navigation }) => {
+const getCurrentLocation = () => {
+  return new Promise((resolve, reject) => {
+    Geolocation.getCurrentPosition(
+      (position) => resolve(position),
+      (error) => reject(error),
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
+  });
+};
+const TracterwaliHomeScreen = ({ navigation }) => {
   const [student, setStudent] = useState(null);
   const [profileImageUri, setProfileImageUri] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState('');
+  const [checkInElapsedTime, setCheckInElapsedTime] = useState(0);
   const [isCheckedOut, setIsCheckedOut] = useState(false);
   const [checkOutTime, setCheckOutTime] = useState('');
   const [isOnBreak, setIsOnBreak] = useState(false);
@@ -136,17 +131,16 @@ const HomeScreen = ({ navigation }) => {
   const [breakReason, setBreakReason] = useState('');
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [cameraPermission, setCameraPermission] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [checkOutCapturedImage, setCheckOutCapturedImage] = useState(null);
+  const [totalDays, setTotalDays] = useState(0);
   const [time, setTime] = useState(new Date());
-  const [currentTime, setCurrentTime] = useState(null)
-  const cameraRef = useRef(null);
-  const device = useCameraDevice('front');
-
   const [isCheckInLoading, setIsCheckInLoading] = useState(false);
   const [isCheckOutLoading, setIsCheckOutLoading] = useState(false);
   const [isBreakLoading, setIsBreakLoading] = useState(false);
+  const [breakTimesModalVisible, setBreakTimesModalVisible] = useState(false);
+  const [breakEndTimesModalVisible, setBreakEndTimesModalVisible] = useState(false);
+  const [cameraPermission, setCameraPermission] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [checkOutCapturedImage, setCheckOutCapturedImage] = useState(null);
   const richTextPending = useRef();
   const richTextToday = useRef();
   const richTextCheckOutNotes = useRef();
@@ -158,7 +152,6 @@ const HomeScreen = ({ navigation }) => {
     'unorderedList',
     'orderedList',
   ];
-
   const [customAlert, setCustomAlert] = useState({
     visible: false,
     type: 'success',
@@ -167,11 +160,15 @@ const HomeScreen = ({ navigation }) => {
     isGeofenceAlert: false,
   });
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  const cameraRef = useRef(null);
+  const device = useCameraDevice('front');
+  const [showTwoMinAlert, setShowTwoMinAlert] = useState(false);
+  const [alertShown, setAlertShown] = useState(false);
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const theme = {
-    background: isDark ? '#000' : '#fff',
-    card: isDark ? '#202327' : '#f8fafc',
+    background: isDark ? '#101317' : '#FFF',
+    card: isDark ? '#202327' : '#FFFFFF',
     text: isDark ? '#f5f5f5' : '#1E293B',
     subText: isDark ? '#fff' : '#64748B',
     border: isDark ? '#333' : '#E5E7EB',
@@ -184,149 +181,171 @@ const HomeScreen = ({ navigation }) => {
     breakStart: '#6c757d',
     breakEnd: '#138496',
   };
-  const showCustomAlert = (
-  type,
-  title,
-  message,
-  isGeofenceAlert = false
-) => {
-  setCustomAlert({
-    visible: true,
-    type,
-    title,
-    message,
-    isGeofenceAlert,
-  });
-
-  // Show animation
-  Animated.spring(scaleAnim, {
-    toValue: 1,
-    friction: 5,
-    tension: 40,
-    useNativeDriver: true,
-  }).start();
-
-  // Auto hide for ALL alerts
-  setTimeout(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 0,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start(() => {
-      setCustomAlert({
-        visible: false,
-        type: 'success',
-        title: '',
-        message: '',
-        isGeofenceAlert: false,
-      });
-    });
-  }, isGeofenceAlert ? 2000 : 1500); // ⏱ location = 2s, normal = 1s
-};
-
-
-useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true);
-      const cameraPerm = await requestCameraPermission();
-      setCameraPermission(cameraPerm);
-      const hasLocationPermission = await requestLocationPermission();
-      if (!hasLocationPermission) {
-        showCustomAlert('error', 'Location Required', 'Please enable location services to use this app.');
-      }
-      await loadData();
-      await fetchAttendance();
-      setLoading(false);
-    };
-    loadInitialData();
-  }, []);
-  
-  
-
-
-  useEffect(() => {
-    fetchServerTime()
-  }, [])
-
-  const fetchServerTime = async () => {
-    try {
-      const response = await fetch('https://stagging.mightymediatech.com/server-time')
-      const data = await response.json()
-
-      const serverDate = new Date(data.time || data.datetime || data)
-      setCurrentTime(serverDate)
-      setLoading(false)
-
-      startTimer(serverDate)
-    } catch (error) {
-      console.log('Error:', error)
-      setLoading(false)
+  const showCustomAlert = (type, title, message, isGeofenceAlert = false) => {
+    setCustomAlert({ visible: true, type, title, message, isGeofenceAlert });
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    if (!isGeofenceAlert) {
+      setTimeout(() => {
+        Animated.timing(scaleAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() =>
+          setCustomAlert({ visible: false, type: 'success', title: '', message: '', isGeofenceAlert: false })
+        );
+      }, 1500);
     }
-  }
-
-  const startTimer = (startTime) => {
-    let current = new Date(startTime)
-
-    setInterval(() => {
-      current = new Date(current.getTime() + 1000)
-      setCurrentTime(new Date(current))
-    }, 1000)
-  }
-
-  const formatTime = (date) => {
-    if (!date) return '--:--:--';
-
-    return date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      // second: '2-digit',
-    });
   };
-  const formatDate = (date) => {
-    if (!date) return ''
-
-    const day = date.getDate().toString().padStart(2, '0')
-    const month = date.toLocaleString('en-US', { month: 'short' })
-    const year = date.getFullYear()
-
-    return `${day} ${month} ${year}`
-  }
-  const getServerTime = () => {
-    return currentTime ? new Date(currentTime) : new Date();
+  const calculateTotalHours = () => {
+    if (!isCheckedOut || !checkInTime || !checkOutTime || checkInTime === '--:--' || checkOutTime === '--:--') {
+      return '00:00:00';
+    }
+    const checkIn = parseTimeString(checkInTime);
+    const checkOut = parseTimeString(checkOutTime);
+    if (!checkIn || !checkOut) return '--:--:--';
+    let diff = checkOut - checkIn;
+    if (diff < 0) {
+      checkOut.setDate(checkOut.getDate() + 1);
+      diff = checkOut - checkIn;
+    }
+    return formatDuration(diff);
   };
-
-  // const formatDuration = (milliseconds) => {
-  //   if (milliseconds < 0) return '--:--:--';
-  //   const hours = Math.floor(milliseconds / 3600000);
-  //   const minutes = Math.floor((milliseconds % 3600000) / 60000);
-  //   const seconds = Math.floor((milliseconds % 60000) / 1000);
-  //   return [
-  //     String(hours).padStart(2, '0'),
-  //     String(minutes).padStart(2, '0'),
-  //     String(seconds).padStart(2, '0'),
-  //   ].join(':');
-  // };
+  const calculateNetWorkingHours = () => {
+    const totalWorkingMs = (() => {
+      const checkIn = parseTimeString(checkInTime);
+      const checkOut = parseTimeString(checkOutTime);
+      if (!isCheckedOut || !checkIn || !checkOut) return 0;
+      let diff = checkOut - checkIn;
+      if (diff < 0) {
+        checkOut.setDate(checkOut.getDate() + 1);
+        diff = checkOut - checkIn;
+      }
+      return diff;
+    })();
+    const netMs = totalWorkingMs - totalBreakDuration;
+    return formatDuration(netMs);
+  };
+  const calculateTotalBreakTime = () => {
+    return formatDuration(totalBreakDuration);
+  };
+  const parseTimeString = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return null;
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes, seconds] = time.split(':').map(Number);
+    let adjustedHours = hours;
+    if (period === 'PM' && hours !== 12) adjustedHours += 12;
+    if (period === 'AM' && hours === 12) adjustedHours = 0;
+    const date = new Date();
+    date.setHours(adjustedHours, minutes, seconds || 0, 0);
+    return date;
+  };
+  const formatDuration = (milliseconds) => {
+    if (milliseconds < 0) return '--:--:--';
+    const hours = Math.floor(milliseconds / 3600000);
+    const minutes = Math.floor((milliseconds % 3600000) / 60000);
+    const seconds = Math.floor((milliseconds % 60000) / 1000);
+    return [
+      String(hours).padStart(2, '0'),
+      String(minutes).padStart(2, '0'),
+      String(seconds).padStart(2, '0'),
+    ].join(':');
+  };
+  const getFormattedDateTime = () => {
+    const now = new Date();
+    const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+    const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+    const formattedTime = now.toLocaleTimeString('en-US', timeOptions);
+    const formattedDate = now.toLocaleDateString('en-GB', dateOptions).replace(', ', ' ');
+    return `${formattedTime}, ${formattedDate}`;
+  };
 
   const getBreakStartTime = () => {
     if (!breakStart) return '--:--';
     const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     return breakStart.toLocaleTimeString('en-US', options);
   };
-
   const getBreakEndTime = () => {
     if (!breakEnd) return '--:--';
     const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     return breakEnd.toLocaleTimeString('en-US', options);
   };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
+  const fetchAttendance = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        showCustomAlert('error', 'Error', 'No auth token found.');
+        return;
+      }
+      const response = await axios.get('https://geeksnode.online/api/today-summary', {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      });
+      const records = response.data.data || [];
+      if (!Array.isArray(records) || records.length === 0) return;
+      const today = new Date().toISOString().split('T')[0];
+      const todayRecord = records.find((record) => record.date?.includes(today)) || records[0];
+      // Existing fields
+      const checkIn = todayRecord.check_in_time || todayRecord.check_in || '--:--';
+      const checkOut = todayRecord.check_out_time || todayRecord.check_out || '--:--';
+      let breakStartStr = '--:--';
+      let breakEndStr = '--:--';
+      if (Array.isArray(todayRecord.breaks) && todayRecord.breaks.length > 0) {
+        const latestBreak = todayRecord.breaks[todayRecord.breaks.length - 1];
+        breakStartStr = latestBreak.break_in_time || latestBreak.break_start || '--:--';
+        breakEndStr = latestBreak.break_out_time || latestBreak.break_end || '--:--';
+      }
+      // NEW: Extract task_from_yesterday
+      const yesterdayPendingTask = todayRecord.task_from_yesterday || todayRecord.pending_tasks || '';
+      const parseTimeToDate = (timeStr) => {
+        if (!timeStr || timeStr === '--:--') return null;
+        let date = new Date();
+        let hours = 0, minutes = 0, seconds = 0;
+        if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
+          const [time, period] = timeStr.split(' ');
+          const [h, m, s] = time.split(':').map(Number);
+          hours = h % 12 + (period.toLowerCase() === 'pm' ? 12 : 0);
+          minutes = m;
+          seconds = s || 0;
+        } else {
+          const [h, m, s] = timeStr.split(':').map(Number);
+          hours = h;
+          minutes = m;
+          seconds = s || 0;
+        }
+        date.setHours(hours, minutes, seconds, 0);
+        return date;
+      };
+      const parsedBreakStart = parseTimeToDate(breakStartStr);
+      const parsedBreakEnd = parseTimeToDate(breakEndStr);
+      // Set states
+      setCheckInTime(checkIn);
+      setCheckOutTime(checkOut);
+      setBreakStart(parsedBreakStart);
+      setBreakEnd(parsedBreakEnd);
+      setIsCheckedIn(checkIn !== '--:--' && checkOut === '--:--');
+      setIsCheckedOut(checkOut !== '--:--');
+      setIsOnBreak(!!parsedBreakStart && !parsedBreakEnd);
+      // NEW: Set yesterday's pending task
+      if (yesterdayPendingTask) {
+        setPaddingtask(yesterdayPendingTask);
+        // Also save to AsyncStorage for persistence
+        await AsyncStorage.setItem('pendingTasksForTomorrow', yesterdayPendingTask);
+      }
+    } catch (error) {
+      console.error('fetchAttendance error:', error);
+      showCustomAlert('error', 'Error', 'Failed to fetch attendance.');
+    }
+  };
   const loadData = async () => {
     try {
       let userData = await AsyncStorage.getItem('userData');
@@ -337,7 +356,7 @@ useEffect(() => {
         const token = await AsyncStorage.getItem('authToken');
         if (token) {
           try {
-            const response = await fetch(`https://stagging.mightymediatech.com/api/user/${userData.id}/image`, {
+            const response = await fetch(`https://geeksnode.online/api/user/${userData.id}/image`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             const json = await response.json();
@@ -367,8 +386,8 @@ useEffect(() => {
             isOnBreak: false,
             breakStart: null,
             breakEnd: null,
-            // totalBreakDuration: 0,
-            // breakDuration: '00:00:00',
+            totalBreakDuration: 0,
+            breakDuration: '00:00:00',
           };
           await AsyncStorage.setItem('attendanceState', JSON.stringify(initialState));
           await AsyncStorage.setItem('activities', JSON.stringify([]));
@@ -380,8 +399,8 @@ useEffect(() => {
           setIsOnBreak(false);
           setBreakStart(null);
           setBreakEnd(null);
-          // setTotalBreakDuration(0);
-          // setBreakDuration('00:00:00');
+          setTotalBreakDuration(0);
+          setBreakDuration('00:00:00');
           setActivities([]);
         } else {
           setIsCheckedIn(state.isCheckedIn || false);
@@ -391,8 +410,8 @@ useEffect(() => {
           setIsOnBreak(state.isOnBreak || false);
           setBreakStart(state.breakStart ? new Date(state.breakStart) : null);
           setBreakEnd(state.breakEnd ? new Date(state.breakEnd) : null);
-          // setTotalBreakDuration(state.totalBreakDuration || 0);
-          // setBreakDuration(state.breakDuration || '00:00:00');
+          setTotalBreakDuration(state.totalBreakDuration || 0);
+          setBreakDuration(state.breakDuration || '00:00:00');
         }
       } else {
         const initialState = {
@@ -403,8 +422,8 @@ useEffect(() => {
           isOnBreak: false,
           breakStart: null,
           breakEnd: null,
-          // totalBreakDuration: 0,
-          // breakDuration: '00:00:00',
+          totalBreakDuration: 0,
+          breakDuration: '00:00:00',
         };
         await AsyncStorage.setItem('attendanceState', JSON.stringify(initialState));
         await AsyncStorage.setItem('activities', JSON.stringify([]));
@@ -418,7 +437,6 @@ useEffect(() => {
       console.error('Error loading data:', error);
     }
   };
-
   const handleCheckIn = async () => {
     if (!checkInTasks || checkInTasks.trim() === '' || checkInTasks.replace(/<[^>]*>/g, '').trim() === '') {
       showCustomAlert('error', 'Error', 'Please enter today\'s tasks!');
@@ -427,26 +445,10 @@ useEffect(() => {
     if (!cameraPermission) {
       showCustomAlert('error', 'Error', 'Camera permission is required to capture a photo.');
       return;
-    } if (!cameraPermission) {
-      showCustomAlert('error', 'Error', 'Camera permission is required to capture a photo.');
-      return;
     }
-
     try {
       setIsCheckInLoading(true);
-      const now = getServerTime();
-      const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
-      const formattedTime = now.toLocaleTimeString('en-US', options);
-      const date = now.toISOString().split('T')[0];
-
-      let user = await AsyncStorage.getItem('userData');
-      user = user ? JSON.parse(user) : null;
-      if (!user) {
-        user = { id: 1, name: '', course_id: '', profile_picture: null };
-        await AsyncStorage.setItem('userData', JSON.stringify(user));
-      }
-
-const hasLocationPermission = await requestLocationPermission();
+      const hasLocationPermission = await requestLocationPermission();
       if (!hasLocationPermission) {
         showCustomAlert('error', 'Error', 'Location permission denied. Please enable location services.');
         setIsCheckInLoading(false);
@@ -460,7 +462,26 @@ const hasLocationPermission = await requestLocationPermission();
         setIsCheckInLoading(false);
         return;
       }
-
+      let photoUri = null;
+      if (cameraRef.current) {
+        const photo = await cameraRef.current.takePhoto({
+          quality: 0.5,
+          flash: 'off',
+        });
+        photoUri = `file://${photo.path}`;
+        setCapturedImage(photoUri);
+        await AsyncStorage.setItem('checkInPhoto', photoUri);
+      }
+      const now = new Date();
+      const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
+      const formattedTime = now.toLocaleTimeString('en-US', options);
+      const date = now.toISOString().split('T')[0];
+      let user = await AsyncStorage.getItem('userData');
+      user = user ? JSON.parse(user) : null;
+      if (!user) {
+        user = { id: 1, name: '', course_id: '', profile_picture: null };
+        await AsyncStorage.setItem('userData', JSON.stringify(user));
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         try {
@@ -469,10 +490,13 @@ const hasLocationPermission = await requestLocationPermission();
             today_task: checkInTasks || '',
             check_in_time: formattedTime,
             date,
+            latitude,
+            longitude,
+            check_in_photo: photoUri || '',
           };
           console.log('📤 Sending to API:', payload);
           const response = await axios.post(
-            'https://stagging.mightymediatech.com/api/check-in',
+            'https://geeksnode.online/api/check-in',
             payload,
             {
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -483,16 +507,14 @@ const hasLocationPermission = await requestLocationPermission();
           // console.error('Check-in API Error:', err.response?.data || err.message);
         }
       }
-
       setCheckInTime(formattedTime);
       setIsCheckedIn(true);
       setIsCheckedOut(false);
-      // setTotalBreakDuration(0);
-      // setBreakDuration('00:00:00');
+      setTotalBreakDuration(0);
+      setBreakDuration('00:00:00');
       setIsOnBreak(false);
       setBreakStart(null);
       setBreakEnd(null);
-
       await AsyncStorage.setItem(
         'attendanceState',
         JSON.stringify({
@@ -503,57 +525,59 @@ const hasLocationPermission = await requestLocationPermission();
           isOnBreak: false,
           breakStart: null,
           breakEnd: null,
-          // totalBreakDuration: 0,
-          // breakDuration: '00:00:00',
+          totalBreakDuration: 0,
+          breakDuration: '00:00:00',
         })
       );
-
       await AsyncStorage.setItem('lastCheckInDate', new Date().toDateString());
-
       logActivity('Check In', formattedTime);
       setCheckInModalVisible(false);
       setCheckInTasks('');
       setPaddingtask('');
-      showCustomAlert('success', 'Success', 'Checked in!');
+      setCapturedImage(null);
+      showCustomAlert('success', 'Success', 'Checked in successfully with photo!');
+      setAlertShown(false);
     } catch (error) {
       console.error('Check-in error:', error);
-      showCustomAlert('error', 'Error', 'Check-in failed.');
+      showCustomAlert('error', 'Error', 'Failed to check in. Please try again.');
     } finally {
       setIsCheckInLoading(false);
     }
   };
-
-  // </-------------- IGNORE -------------->
-
+  //<---------------------------------Check In------------------------------->
   const handleCheckOut = async () => {
     const cleanText = (text) => text?.replace(/<[^>]*>/g, '').trim();
-
-    if (!checkOutNotes && !checkOutPendingTasks) {
-      showCustomAlert('error', 'Error', 'Please fill out both fields.');
-      return;
-    }
-
+    // if (!checkOutNotes || !checkOutPendingTasks || !Dependencies) {
+    //   showCustomAlert('error', 'Error', 'Please fill out all required fields.');
+    //   return;
+    // }
     if (!cleanText(checkOutNotes)) {
       showCustomAlert('error', 'Error', 'Please enter today’s tasks.');
       return;
     }
-
     if (!cleanText(checkOutPendingTasks)) {
       showCustomAlert('error', 'Error', 'Please enter pending tasks for tomorrow.');
       return;
     }
+    if (!cleanText(Dependencies)) {
+      showCustomAlert('error', 'Error', 'Please enter Dependencies.');
+      return;
+    }
+    if (!AnyBlocker) {
+      showCustomAlert('error', 'Error', 'Please enter Any Blocker.');
+      return;
+    }
+    if (!Issue) {
+      showCustomAlert('error', 'Error', 'Please enter Any Issue.');
+      return;
+    }
+    if (!cameraPermission) {
+      showCustomAlert('error', 'Error', 'Camera permission is required to capture a photo.');
+      return;
+    }
     try {
       setIsCheckOutLoading(true);
-      const now = getServerTime();
-      const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
-      const formattedTime = now.toLocaleTimeString('en-US', options);
-      const date = now.toISOString().split('T')[0];
-      const user = JSON.parse(await AsyncStorage.getItem('userData'));
-      const token = await AsyncStorage.getItem('authToken');
-
-      await AsyncStorage.setItem('pendingTasksForTomorrow', checkOutPendingTasks || '');
-
-const hasPermission = await requestLocationPermission();
+      const hasPermission = await requestLocationPermission();
       if (!hasPermission) {
         showCustomAlert('error', 'Error', 'Location permission denied. Please enable location services.');
         setIsCheckOutLoading(false);
@@ -567,7 +591,23 @@ const hasPermission = await requestLocationPermission();
         setIsCheckOutLoading(false);
         return;
       }
-
+      let photoUri = null;
+      if (cameraRef.current) {
+        const photo = await cameraRef.current.takePhoto({
+          quality: 0.5,
+          flash: 'off',
+        });
+        photoUri = `file://${photo.path}`;
+        setCheckOutCapturedImage(photoUri);
+        await AsyncStorage.setItem('checkOutPhoto', photoUri);
+      }
+      const now = new Date();
+      const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
+      const formattedTime = now.toLocaleTimeString('en-US', options);
+      const date = now.toISOString().split('T')[0];
+      const user = JSON.parse(await AsyncStorage.getItem('userData'));
+      const token = await AsyncStorage.getItem('authToken');
+      await AsyncStorage.setItem('pendingTasksForTomorrow', checkOutPendingTasks || '');
       if (token) {
         try {
           const payload = {
@@ -579,10 +619,11 @@ const hasPermission = await requestLocationPermission();
             dependencies: Dependencies || '',
             any_blocker: AnyBlocker || '',
             issue: Issue || '',
+            check_out_photo: photoUri || '',
           };
           console.log('📤 Sending Check-Out to API:', payload);
           const response = await axios.post(
-            'https://stagging.mightymediatech.com/api/check-out',
+            'https://geeksnode.online/api/check-out',
             payload,
             { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }
           );
@@ -591,77 +632,59 @@ const hasPermission = await requestLocationPermission();
           // console.error('Check-out API error:', error.response?.data || error.message);
         }
       }
-
       setCheckOutTime(formattedTime);
       setIsCheckedIn(false);
       setIsCheckedOut(true);
       setIsOnBreak(false);
-
       await AsyncStorage.setItem(
         'attendanceState',
         JSON.stringify({
           isCheckedIn: false,
-          checkInTime: checkInTime,
+          checkInTime,
           isCheckedOut: true,
           checkOutTime: formattedTime,
           isOnBreak: false,
           breakStart: breakStart ? breakStart.toISOString() : null,
           breakEnd: breakEnd ? breakEnd.toISOString() : null,
-          // totalBreakDuration,
-          // breakDuration,
+          totalBreakDuration,
+          breakDuration,
         })
       );
-
-      await AsyncStorage.setItem('lastCheckInDate', '');
-
       logActivity('Check Out', formattedTime, checkOutNotes || 'No notes provided');
-
       setCheckOutModalVisible(false);
       setCheckOutNotes('');
       setCheckOutPendingTasks('');
       setDependencies('');
       setAnyBlocker('');
       setIssue('');
-
-      showCustomAlert('success', 'Success', 'Checked out successfully!');
+      setCheckOutCapturedImage(null);
+      showCustomAlert('success', 'Success', 'Checked out successfully with photo!');
     } catch (error) {
       console.error('Check-out error:', error);
-      setCheckOutModalVisible(false);
-      setCheckOutNotes('');
-      setCheckOutPendingTasks('');
-      setDependencies('');
-      setAnyBlocker('');
-      setIssue('');
-      showCustomAlert('success', 'Success', 'Checked out successfully!');
+      showCustomAlert('error', 'Error', 'Failed to check out. Please try again.');
     } finally {
       setIsCheckOutLoading(false);
     }
   };
-
-  // </-------------- IGNORE -------------->
-
+  //<---------------------------------Check Out------------------------------->
   const handleBreakStart = async () => {
-
     if (!breakReason) {
       showCustomAlert('error', 'Error', 'Please enter break reason.');
       return;
     }
-
     try {
       setIsBreakLoading(true);
-      const now = getServerTime();
+      const now = new Date();
       const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
       const formattedTime = now.toLocaleTimeString('en-US', options);
       const date = now.toISOString().split('T')[0];
-
       const userStr = await AsyncStorage.getItem('userData');
       const user = userStr ? JSON.parse(userStr) : null;
-
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         try {
           const response = await axios.post(
-            'https://stagging.mightymediatech.com/api/start-break',
+            'https://geeksnode.online/api/start-break',
             {
               user_id: user.id,
               break_start_time: formattedTime,
@@ -677,14 +700,12 @@ const hasPermission = await requestLocationPermission();
           );
           console.log('✅ Start-Break API Response:', response.data);
         } catch (err) {
-          // Error handling remains empty as in your original code
+          // console.error('Start-Break API error:', err.response?.data || err.message);
         }
       }
-
       setBreakStart(now);
       setIsOnBreak(true);
-      // setBreakDuration(formatDuration(totalBreakDuration));
-
+      setBreakDuration(formatDuration(totalBreakDuration));
       await AsyncStorage.setItem(
         'attendanceState',
         JSON.stringify({
@@ -695,24 +716,22 @@ const hasPermission = await requestLocationPermission();
           isOnBreak: true,
           breakStart: now.toISOString(),
           breakEnd: null,
-          // totalBreakDuration,
-          // breakDuration: formatDuration(totalBreakDuration),
+          totalBreakDuration,
+          breakDuration: formatDuration(totalBreakDuration),
         })
       );
-
       logActivity('Break Start', formattedTime, breakReason || '');
       setBreakModalVisible(false);
       setBreakReason('');
       showCustomAlert('success', 'Success', 'Break started!');
     } catch (error) {
-      console.error('Break start error (outer):', error);
+      console.error('Break start error:', error);
       showCustomAlert('error', 'Error', 'Failed to start break.');
     } finally {
       setIsBreakLoading(false);
     }
   };
-
-  // </-------------- IGNORE -------------->
+  //<---------------------------------Break Start------------------------------->
   const handleBreakEnd = async () => {
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) {
@@ -730,25 +749,22 @@ const hasPermission = await requestLocationPermission();
     }
     try {
       setIsBreakLoading(true);
-      const now = getServerTime();
+      const now = new Date();
       const options = { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true };
       const formattedTime = now.toLocaleTimeString('en-US', options);
       const date = now.toISOString().split('T')[0];
-
       const userStr = await AsyncStorage.getItem('userData');
       const user = userStr ? JSON.parse(userStr) : null;
-
-      // if (breakStart) {
-      //   const breakTime = now - breakStart;
-      //   setTotalBreakDuration((prev) => prev + breakTime);
-      //   setBreakDuration(formatDuration(totalBreakDuration + breakTime));
-      // }
-
+      if (breakStart) {
+        const breakTime = now - breakStart;
+        setTotalBreakDuration((prev) => prev + breakTime);
+        setBreakDuration(formatDuration(totalBreakDuration + breakTime));
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         try {
           const response = await axios.post(
-            'https://stagging.mightymediatech.com/api/end-break',
+            'https://geeksnode.online/api/end-break',
             {
               user_id: user.id,
               break_end_time: formattedTime,
@@ -763,7 +779,7 @@ const hasPermission = await requestLocationPermission();
           );
           console.log('✅ End-Break API Response:', response.data);
         } catch (err) {
-          // Error handling remains empty as in your original code
+          // console.error('End-Break API error:', err.response?.data || err.message);
         }
       }
       setIsOnBreak(false);
@@ -778,22 +794,20 @@ const hasPermission = await requestLocationPermission();
           isOnBreak: false,
           breakStart: breakStart?.toISOString(),
           breakEnd: now.toISOString(),
-          // totalBreakDuration: totalBreakDuration + (breakStart ? now - breakStart : 0),
-          // breakDuration: formatDuration(totalBreakDuration + (breakStart ? now - breakStart : 0)),
+          totalBreakDuration: totalBreakDuration + (breakStart ? now - breakStart : 0),
+          breakDuration: formatDuration(totalBreakDuration + (breakStart ? now - breakStart : 0)),
         })
       );
       logActivity('Break End', formattedTime);
       showCustomAlert('success', 'Success', 'Break ended!');
     } catch (error) {
-      console.error('Break end error (outer):', error);
+      console.error('Break end error:', error);
       showCustomAlert('error', 'Error', 'Failed to end break.');
     } finally {
       setIsBreakLoading(false);
     }
   };
-
-  // </-------------- IGNORE -------------->
-
+  //<---------------------------------Break End------------------------------->
   const logActivity = async (type, time, reason = '') => {
     const date = new Date().toLocaleDateString();
     const newActivity = { type, time, date, reason };
@@ -801,15 +815,14 @@ const hasPermission = await requestLocationPermission();
     setActivities(updatedActivities);
     await AsyncStorage.setItem('activities', JSON.stringify(updatedActivities));
   };
-
   useEffect(() => {
     let interval;
     if (isOnBreak && breakStart) {
       interval = setInterval(() => {
-        // const currentBreakTime = new Date() - breakStart;
-        // const total = totalBreakDuration + currentBreakTime;
-        // const formatted = formatDuration(total);
-        // setBreakDuration(formatted);
+        const currentBreakTime = new Date() - breakStart;
+        const total = totalBreakDuration + currentBreakTime;
+        const formatted = formatDuration(total);
+        setBreakDuration(formatted);
         AsyncStorage.setItem(
           'attendanceState',
           JSON.stringify({
@@ -820,62 +833,30 @@ const hasPermission = await requestLocationPermission();
             isOnBreak,
             breakStart: breakStart?.toISOString(),
             breakEnd: breakEnd ? breakEnd.toISOString() : null,
-            // totalBreakDuration,
-            // breakDuration: formatted,
+            totalBreakDuration,
+            breakDuration: formatted,
           })
         );
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isOnBreak, breakStart, isCheckedIn, checkInTime, isCheckedOut, checkOutTime,  breakEnd]);
-
-  useEffect(() => {
-    const interval = setInterval(() => { }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      const cameraPerm = await requestCameraPermission();
-      setCameraPermission(cameraPerm);
-      setLoading(true);
-      await loadData();
-      await fetchAttendance();
-      setLoading(false);
-    };
-
-    loadInitialData();
-
-    const interval = setInterval(() => {
-      fetchAttendance();
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setLoading(true);
-    await loadData();
-    await fetchAttendance();
-    setRefreshing(false);
-    setLoading(false);
-  };
-
+  }, [isOnBreak, breakStart, isCheckedIn, checkInTime, isCheckedOut, checkOutTime, totalBreakDuration, breakEnd]);
   useEffect(() => {
     if (checkInModalVisible) {
       const loadPendingTasks = async () => {
         try {
-          const pendingTasks = await AsyncStorage.getItem('pendingTasksForTomorrow');
-          if (pendingTasks) {
-            setPaddingtask(pendingTasks);
+          if (paddingtask) {
             setTimeout(() => {
-              richTextPending.current?.setContentHTML(pendingTasks);
+              richTextPending.current?.setContentHTML(paddingtask);
             }, 100);
           } else {
-            setPaddingtask('');
-            richTextPending.current?.setContentHTML('');
+            const stored = await AsyncStorage.getItem('pendingTasksForTomorrow');
+            if (stored) {
+              setPaddingtask(stored);
+              setTimeout(() => {
+                richTextPending.current?.setContentHTML(stored);
+              }, 100);
+            }
           }
         } catch (error) {
           console.error('Error loading pending tasks:', error);
@@ -883,151 +864,165 @@ const hasPermission = await requestLocationPermission();
       };
       loadPendingTasks();
     }
-  }, [checkInModalVisible]);
-
-  const fetchAttendance = async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        showCustomAlert('error', 'Error', 'No auth token found.');
-        return;
-      }
-      const response = await axios.get('https://stagging.mightymediatech.com/api/today-summary', {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      });
-      const records = response.data.data || [];
-      if (!Array.isArray(records) || records.length === 0) return;
-      const today = new Date().toISOString().split('T')[0];
-      const todayRecord = records.find((record) => record.date?.includes(today)) || records[0];
-      const checkIn = todayRecord.check_in_time || todayRecord.check_in || '--:--';
-      const checkOut = todayRecord.check_out_time || todayRecord.check_out || '--:--';
-      let breakStartStr = '--:--';
-      let breakEndStr = '--:--';
-      if (Array.isArray(todayRecord.breaks) && todayRecord.breaks.length > 0) {
-        const latestBreak = todayRecord.breaks[todayRecord.breaks.length - 1];
-        breakStartStr = latestBreak.break_in_time || latestBreak.break_start || '--:--';
-        breakEndStr = latestBreak.break_out_time || latestBreak.break_end || '--:--';
-      }
-      const yesterdayPendingTask = todayRecord.task_from_yesterday || todayRecord.pending_tasks || '';
-      const parseTimeToDate = (timeStr) => {
-        if (!timeStr || timeStr === '--:--') return null;
-        let date = new Date();
-        let hours = 0, minutes = 0, seconds = 0;
-        if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
-          const [time, period] = timeStr.split(' ');
-          const [h, m, s] = time.split(':').map(Number);
-          hours = h % 12 + (period.toLowerCase() === 'pm' ? 12 : 0);
-          minutes = m;
-          seconds = s || 0;
-        } else {
-          const [h, m, s] = timeStr.split(':').map(Number);
-          hours = h;
-          minutes = m;
-          seconds = s || 0;
+  }, [checkInModalVisible, paddingtask]);
+  //<---------------------------------checkInModalVisible------------------------------->
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+  //<---------------------------------Date------------------------------->
+  useEffect(() => {
+    let timerInterval;
+    if (isCheckedIn && checkInTime && !isCheckedOut) {
+      timerInterval = setInterval(() => {
+        const checkInDate = parseTimeString(checkInTime);
+        if (checkInDate) {
+          const elapsed = new Date() - checkInDate;
+          setCheckInElapsedTime(elapsed);
         }
-        date.setHours(hours, minutes, seconds, 0);
-        return date;
-      };
-      const parsedBreakStart = parseTimeToDate(breakStartStr);
-      const parsedBreakEnd = parseTimeToDate(breakEndStr);
-      setCheckInTime(checkIn);
-      setCheckOutTime(checkOut);
-      setBreakStart(parsedBreakStart);
-      setBreakEnd(parsedBreakEnd);
-      setIsCheckedIn(checkIn !== '--:--' && checkOut === '--:--');
-      setIsCheckedOut(checkOut !== '--:--');
-      setIsOnBreak(!!parsedBreakStart && !parsedBreakEnd);
-      if (yesterdayPendingTask) {
-        setPaddingtask(yesterdayPendingTask);
-        await AsyncStorage.setItem('pendingTasksForTomorrow', yesterdayPendingTask);
-      }
-    } catch (error) {
-      // console.error('fetchAttendance error:', error);
-      showCustomAlert('error', 'Error', 'Failed to fetch attendance.');
+      }, 1000);
+    } else {
+      setCheckInElapsedTime(0);
     }
+    return () => clearInterval(timerInterval);
+  }, [isCheckedIn, checkInTime, isCheckedOut]);
+  //<---------------------------------Location------------------------------->
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setLoading(true);
+      const cameraPerm = await requestCameraPermission();
+      setCameraPermission(cameraPerm);
+      const hasLocationPermission = await requestLocationPermission();
+      if (!hasLocationPermission) {
+        showCustomAlert('error', 'Location Required', 'Please enable location services to use this app.');
+      }
+      await loadData();
+      await fetchAttendance();
+      setLoading(false);
+    };
+    loadInitialData();
+  }, []);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    await fetchAttendance();
+    setRefreshing(false);
   };
-
+  //<---------------------------------Location Permission------------------------------->
+  useEffect(() => {
+    let interval;
+    if (isCheckedIn && !isCheckedOut && !alertShown) {
+      interval = setInterval(() => {
+        const checkInDate = parseTimeString(checkInTime);
+        if (checkInDate) {
+          const elapsed = new Date() - checkInDate;
+          if (elapsed >= 120000) {// 2 minutes
+            setShowTwoMinAlert(true);
+            setAlertShown(true);
+          }
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isCheckedIn, isCheckedOut, checkInTime, alertShown]);
+  //<---------------------------------Shift Alert------------------------------->
   if (loading || refreshing) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <View style={styles.loaderWrapper}>
-          <Image
-            source={require('../assets/only.png')}
-            style={styles.logo}
-          />
-
-          <ActivityIndicator
-            size="large"
-            color="#2e86de"
-            style={styles.loader}
-          />
-        </View>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading Attendance...</Text>
       </View>
     );
   }
-
   return (
     <View style={[styles.mainContainer, { backgroundColor: theme.background }]}>
-      <View style={[styles.logoContainer, { backgroundColor: theme.card }]}>
+
+      <View style={[styles.logoContainer
+        ,
+            {
+              backgroundColor: isDark ? '#202327' : '#f8fafc',
+              shadowColor: '#000',
+              shadowOpacity: isDark ? 0.25 : 0.05,
+              borderColor: isDark ? '#334155' : 'transparent',
+              borderWidth: isDark ? 0.5 : 0,
+            },
+      ]}>
         <Image source={require('../assets/mmtlogo.png')} style={styles.logoImage} />
       </View>
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} 
-       colors={['#2563eb']}
-            progressBackgroundColor={isDark ? theme.background : '#ffffff'}
-      />}>
-        <View style={[styles.header, { backgroundColor: theme.background }]}>
+      <ScrollView refreshControl={<RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={['#1d74ff']}
+        tintColor="#1d74ff"
+        progressBackgroundColor={isDark ? theme.background : '#ffffff'}
+      />}
+        showsVerticalScrollIndicator={false}>
+        <View style={[styles.header, { backgroundColor: theme.card }]}>
           <View style={styles.profileSection}>
             <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen')}
               activeOpacity={0.7}>
               {profileImageUri ? (
                 <Image source={{ uri: profileImageUri }} style={styles.profileImage} />
               ) : (
-                <Image source={require('../assets/avatar.png')} style={styles.profileImage} />
+                    <Image source={require('../assets/avatar.png')} style={styles.profileImage} />
               )}
               <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{student?.status || 'Active'}</Text>
-              </View>
+                          <Text style={styles.activeBadgeText}>{student?.status || 'Active'}</Text>
+                        </View>
             </TouchableOpacity>
             <View>
-              <Text style={[styles.userName, { color: theme.text }]}>{student?.name || ''}</Text>
+              <Text style={[styles.userName, { color: theme.subText }]}>{student?.name || ''}</Text>
               <Text style={[styles.userRole, { color: theme.subText }]}>
                 {student?.roles && student.roles.length > 0 ? student.roles[0].name : ''}
               </Text>
-
-              <Text style={[styles.dateText, { color: theme.subText }]}>{formatTime(currentTime)},  {formatDate(currentTime)}</Text>
-
+              <Text style={[styles.dateText, { color: theme.subText }]}>{getFormattedDateTime()}</Text>
             </View>
           </View>
         </View>
-
         <View style={[styles.attendanceSection, { backgroundColor: theme.card }]}>
-          <Text style={styles.sectionTitle}>Today Attendance</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Homekiroport')}> 
+          </TouchableOpacity>
+
+            <Text style={[styles.sectionTitle, { color: theme.subText }]}>Today Attendance</Text>
+
           <View style={styles.timeCardContainer}>
             <View style={[styles.timeCard, { backgroundColor: theme.background }]}>
-              <Text style={[styles.timeCardTitle, { color: theme.text }]}>Check In</Text>
-              <Text style={[styles.timeText, { color: theme.text }]}>{checkInTime || '--:--'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.timeCardTitle, { color: theme.subText }]}>Check In</Text>
+                {isCheckedIn && !isCheckedOut && checkInElapsedTime > 0 && (
+                  <Text style={[styles.timeCardTitle, { color: '#101520ff', fontSize: 10, marginLeft: 10 }, { color: theme.subText }]}>
+                    ( {formatDuration(checkInElapsedTime)} )
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.timeText}>{checkInTime || '--:--'}</Text>
             </View>
             <View style={[styles.timeCard, { backgroundColor: theme.background }]}>
-              <Text style={[styles.timeCardTitle, { color: theme.text }]}>Check Out</Text>
-              <Text style={[styles.timeText, { color: theme.text }]}>{checkOutTime || '--:--'}</Text>
+              <Text style={[styles.timeCardTitle, { color: theme.subText }]}>Check Out</Text>
+              <Text style={styles.timeText}>{checkOutTime || '--:--'}</Text>
             </View>
           </View>
           <View style={styles.timeCardContainer}>
             <View style={[styles.timeCard, { backgroundColor: theme.background }]}>
-              <Text style={[styles.timeCardTitle, { color: theme.text }]}>Break's Start</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[styles.timeCardTitle, { color: theme.subText }]}>Break's Start</Text>
 
-              <Text style={[styles.timeText, { color: theme.text }]}>{getBreakStartTime()}</Text>
+              </View>
+              <Text style={styles.timeText}>{getBreakStartTime()}</Text>
             </View>
             <View style={[styles.timeCard, { backgroundColor: theme.background }]}>
-              <Text style={[styles.timeCardTitle, { color: theme.text }]}>Break's End</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[styles.timeCardTitle, { color: theme.subText }]}>Break's End</Text>
 
-              <Text style={[styles.timeText, { color: theme.text }]}>{getBreakEndTime()}</Text>
+              </View>
+              <Text style={styles.timeText}>{getBreakEndTime()}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.buttonContainer}>
+<View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[
               styles.actionButton,
@@ -1057,8 +1052,39 @@ const hasPermission = await requestLocationPermission();
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
+        <View style={[styles.activitySection, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.subText }]}>Recent Activity</Text>
+          <View style={[styles.activityItem, { backgroundColor: theme.background }]}>
+            <Text style={[styles.activityType, { color: theme.subText }]}>Shift Hours</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.activityTime, { color: theme.subText }]}>
+                {calculateTotalHours()}
+              </Text>
+              <Text style={{ fontSize: 10, color: theme.subText }}>HH:MM:SS</Text>
+            </View>
+          </View>
+          <View style={[styles.activityItem, { backgroundColor: theme.background }]}>
+            <Text style={[styles.activityType, { color: theme.subText }]}>Total Break Time</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.activityTime, { color: theme.subText }]}>
+                {calculateTotalBreakTime()}
+              </Text>
+              <Text style={{ fontSize: 10, color: theme.subText }}>HH:MM:SS</Text>
+            </View>
+          </View>
+          <View style={[styles.activityItem, { backgroundColor: theme.background }]}>
+            <Text style={[styles.activityType, { color: theme.subText }]}>Working Hours</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.activityTime, { color: theme.subText }]}>
+                {isCheckedOut ? calculateNetWorkingHours() : '00:00:00'}
+              </Text>
+              <Text style={{ fontSize: 10, color: theme.subText }}>HH:MM:SS</Text>
+            </View>
+          </View>
+        </View>
+
+      </ScrollView>
       <Modal
         animationType="slide"
         transparent={true}
@@ -1221,7 +1247,6 @@ const hasPermission = await requestLocationPermission();
           </View>
         </View>
       </Modal>
-
       <Modal
         animationType="slide"
         transparent={true}
@@ -1399,7 +1424,7 @@ const hasPermission = await requestLocationPermission();
                 },
               ]}
               multiline
-              placeholder="List any Issue"
+              placeholder="Any blockers if any"
               placeholderTextColor={isDark ? '#aaa' : '#64748B'}
               value={Issue}
               onChangeText={setIssue}
@@ -1429,8 +1454,6 @@ const hasPermission = await requestLocationPermission();
           </View>
         </View>
       </Modal>
-
-
       <Modal
         animationType="slide"
         transparent={true}
@@ -1439,18 +1462,13 @@ const hasPermission = await requestLocationPermission();
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-            <Text style={styles.modalTitle}>Start Break</Text>
-            <Text style={styles.modalHeading}>Write Break Reason Here</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Start Break</Text>
+            <Text style={[styles.modalHeading, { color: theme.text }]}>Write Break Reason Here</Text>
             <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: theme.card,
-                  color: theme.text,
-                },
-              ]}
+              style={[styles.textInput, { backgroundColor: theme.card, color: theme.text },]}
               multiline
               placeholder="Break reason here"
+              placeholderTextColor={isDark ? '#aaa' : '#64748B'}
               value={breakReason}
               onChangeText={setBreakReason}
             />
@@ -1476,8 +1494,7 @@ const hasPermission = await requestLocationPermission();
           </View>
         </View>
       </Modal>
-
-       <Modal
+      <Modal
         animationType="none"
         transparent={true}
         visible={customAlert.visible}
@@ -1523,11 +1540,46 @@ const hasPermission = await requestLocationPermission();
           </Animated.View>
         </View>
       </Modal>
-
+      {/* <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showTwoMinAlert}
+        onRequestClose={() => setShowTwoMinAlert(false)} >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Alert</Text>
+            <Text style={[styles.customAlertText, { color: theme.text }]}>You have reached 2 minutes. Continue or Check-out?</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.submitButton1}
+                onPress={() => {
+                  setShowTwoMinAlert(false);
+                }}>
+                <Text style={styles.buttonText}>Continue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton1}
+                onPress={() => {
+                  setShowTwoMinAlert(false);
+                  setCheckOutModalVisible(true);
+                }}>
+                <Text style={styles.buttonText}>Check-out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal> */}
+      {datePickerVisible && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1, backgroundColor: '#F9FAFB',
@@ -1543,11 +1595,6 @@ const styles = StyleSheet.create({
     width: 250,
     height: 150,
   },
-
-  loaderWrapper: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
-  logo: { width: 20, height: 20, resizeMode: 'contain', position: 'absolute', zIndex: 1 },
-  loader: { position: 'absolute', },
-
   loadingContainer: {
     flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB',
   },
@@ -1561,7 +1608,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
   },
   profileImage: {
-    width: 90, height: 90, borderRadius: 100, borderWidth: 2, borderColor: '#f8fafc', borderWidth: 2, shadowColor: '#000',
+    width: 90, height: 90, borderRadius: 100, borderWidth: 2, borderColor: '#f8fafc', borderWidth:2, shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
   },
   defaultProfile: {
@@ -1572,8 +1619,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF', fontSize: 22, fontWeight: '700', textTransform: 'uppercase',
   },
   activeBadge: {
-    position: 'absolute', bottom: 2, alignSelf: 'center', backgroundColor: '#22c55e', paddingHorizontal: 7, paddingVertical: 3,
-    borderRadius: 20, borderColor: '#fff', borderWidth: 2
+    position: 'absolute',
+    bottom: 2,
+    alignSelf:'center',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderColor:'#fff',
+    borderWidth:2
   },
   activeBadgeText: { color: '#fff', fontSize: 7, fontWeight: '600' },
   userName: {
@@ -1590,7 +1644,7 @@ const styles = StyleSheet.create({
     marginTop: 10, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18, fontWeight: '700', marginBottom: 12, color: '#0a74ff', fontFamily: 'System',
+    fontSize: 18, fontWeight: '700', marginBottom: 12, color: '#1E293B', fontFamily: 'System',
   },
   timeCardContainer: {
     flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10,
@@ -1610,7 +1664,7 @@ const styles = StyleSheet.create({
   },
   activitySection: {
     width: '95%', alignSelf: 'center', padding: 20, backgroundColor: '#FFFFFF', marginTop: 10,
-    borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4,
+    borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, 
     elevation: 3, marginBottom: 30,
   },
   activityItem: {
@@ -1656,7 +1710,7 @@ const styles = StyleSheet.create({
     shadowColor: 'rgba(0, 0, 0, 0.5)', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10, alignSelf: 'center'
   },
   modalTitle: {
-    fontSize: 24, fontWeight: '700', marginBottom: 20, color: '#0a74ff', fontFamily: 'System', textAlign: 'center',
+    fontSize: 24, fontWeight: '700', marginBottom: 20, color: '#1E293B', fontFamily: 'System', textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.1)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   modalTitle1: {
@@ -1664,7 +1718,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.1)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   modalHeading: {
-    fontSize: 16, fontWeight: '600', color: '#0a74ff', fontFamily: 'System', marginBottom: 12,
+    fontSize: 16, fontWeight: '600', color: '#1E293B', fontFamily: 'System', marginBottom: 12,
     textShadowColor: 'rgba(0, 0, 0, 0.05)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1,
   },
   requiredAsterisk: {
@@ -1740,4 +1794,4 @@ const styles = StyleSheet.create({
     fontSize: 16, color: '#64748B', textAlign: 'center', marginTop: 20, fontFamily: 'System',
   },
 });
-export default HomeScreen;
+export default TracterwaliHomeScreen;

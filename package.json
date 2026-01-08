@@ -22,6 +22,7 @@
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-app-intro-slider": "^4.0.4",
+    "react-native-geolocation-service": "^5.3.1",
     "react-native-image-crop-picker": "^0.51.1",
     "react-native-pell-rich-editor": "^1.10.0",
     "react-native-safe-area-context": "^5.5.2",

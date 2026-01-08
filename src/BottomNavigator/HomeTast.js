@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   RefreshControl,
+  KeyboardAvoidingView,
   Platform,
   Dimensions,
   Animated,
@@ -19,72 +20,12 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import Geolocation from 'react-native-geolocation-service';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
- const targetLat = 28.41482550165086;
-const targetLng = 70.305432536986;
-// Test k lia //
-// const targetLat = 28.42224990676678;
-// const targetLng = 70.31447411217071;
-
-const haversineDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-const requestLocationPermission = async () => {
-  if (Platform.OS === 'android') {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'This app needs access to your location to verify check-in.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } catch (err) {
-      console.warn('Permission request error:', err);
-      return false;
-    }
-  } else {
-    try {
-      const position = await getCurrentLocation();
-      return !!position;
-    } catch (error) {
-      console.warn('Location services error:', error);
-      return false;
-    }
-  }
-};
-
-const getCurrentLocation = () => {
-  return new Promise((resolve, reject) => {
-    Geolocation.getCurrentPosition(
-      (position) => resolve(position),
-      (error) => reject(error),
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 10000,
-      }
-    );
-  });
-};
 
 const requestCameraPermission = async () => {
   if (Platform.OS === 'android') {
@@ -164,7 +105,6 @@ const HomeScreen = ({ navigation }) => {
     type: 'success',
     title: '',
     message: '',
-    isGeofenceAlert: false,
   });
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const scheme = useColorScheme();
@@ -184,65 +124,23 @@ const HomeScreen = ({ navigation }) => {
     breakStart: '#6c757d',
     breakEnd: '#138496',
   };
-  const showCustomAlert = (
-  type,
-  title,
-  message,
-  isGeofenceAlert = false
-) => {
-  setCustomAlert({
-    visible: true,
-    type,
-    title,
-    message,
-    isGeofenceAlert,
-  });
-
-  // Show animation
-  Animated.spring(scaleAnim, {
-    toValue: 1,
-    friction: 5,
-    tension: 40,
-    useNativeDriver: true,
-  }).start();
-
-  // Auto hide for ALL alerts
-  setTimeout(() => {
+  const showCustomAlert = (type, title, message) => {
+    setCustomAlert({ visible: true, type, title, message });
     Animated.spring(scaleAnim, {
-      toValue: 0,
+      toValue: 1,
       friction: 5,
       tension: 40,
       useNativeDriver: true,
-    }).start(() => {
-      setCustomAlert({
-        visible: false,
-        type: 'success',
-        title: '',
-        message: '',
-        isGeofenceAlert: false,
-      });
-    });
-  }, isGeofenceAlert ? 2000 : 1500); // ⏱ location = 2s, normal = 1s
-};
-
-
-useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true);
-      const cameraPerm = await requestCameraPermission();
-      setCameraPermission(cameraPerm);
-      const hasLocationPermission = await requestLocationPermission();
-      if (!hasLocationPermission) {
-        showCustomAlert('error', 'Location Required', 'Please enable location services to use this app.');
-      }
-      await loadData();
-      await fetchAttendance();
-      setLoading(false);
-    };
-    loadInitialData();
-  }, []);
-  
-  
+    }).start();
+    setTimeout(() => {
+      Animated.spring(scaleAnim, {
+        toValue: 0,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => setCustomAlert({ visible: false, type: 'success', title: '', message: '' }));
+    }, 1000);
+  };
 
 
   useEffect(() => {
@@ -427,9 +325,6 @@ useEffect(() => {
     if (!cameraPermission) {
       showCustomAlert('error', 'Error', 'Camera permission is required to capture a photo.');
       return;
-    } if (!cameraPermission) {
-      showCustomAlert('error', 'Error', 'Camera permission is required to capture a photo.');
-      return;
     }
 
     try {
@@ -444,21 +339,6 @@ useEffect(() => {
       if (!user) {
         user = { id: 1, name: '', course_id: '', profile_picture: null };
         await AsyncStorage.setItem('userData', JSON.stringify(user));
-      }
-
-const hasLocationPermission = await requestLocationPermission();
-      if (!hasLocationPermission) {
-        showCustomAlert('error', 'Error', 'Location permission denied. Please enable location services.');
-        setIsCheckInLoading(false);
-        return;
-      }
-      const position = await getCurrentLocation();
-      const { latitude, longitude } = position.coords;
-      const distance = haversineDistance(latitude, longitude, targetLat, targetLng);
-      if (distance > 100) {
-        showCustomAlert('error', 'Error', 'You must be within 100 meters of the office to check-in!', true);
-        setIsCheckInLoading(false);
-        return;
       }
 
       const token = await AsyncStorage.getItem('authToken');
@@ -552,21 +432,6 @@ const hasLocationPermission = await requestLocationPermission();
       const token = await AsyncStorage.getItem('authToken');
 
       await AsyncStorage.setItem('pendingTasksForTomorrow', checkOutPendingTasks || '');
-
-const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        showCustomAlert('error', 'Error', 'Location permission denied. Please enable location services.');
-        setIsCheckOutLoading(false);
-        return;
-      }
-      const position = await getCurrentLocation();
-      const { latitude, longitude } = position.coords;
-      const distance = haversineDistance(latitude, longitude, targetLat, targetLng);
-      if (distance > 100) {
-        showCustomAlert('error', 'Error', 'You must be within 100 meters of the office to check-out!', true);
-        setIsCheckOutLoading(false);
-        return;
-      }
 
       if (token) {
         try {
@@ -714,20 +579,6 @@ const hasPermission = await requestLocationPermission();
 
   // </-------------- IGNORE -------------->
   const handleBreakEnd = async () => {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) {
-      showCustomAlert('error', 'Error', 'Location permission denied. Please enable location services.');
-      setIsCheckInLoading(false);
-      return;
-    }
-    const position = await getCurrentLocation();
-    const { latitude, longitude } = position.coords;
-    const distance = haversineDistance(latitude, longitude, targetLat, targetLng);
-    if (distance > 100) {
-      showCustomAlert('error', 'Error', 'You must be within 100 meters of the office to end break!', true);
-      setIsCheckInLoading(false);
-      return;
-    }
     try {
       setIsBreakLoading(true);
       const now = getServerTime();
@@ -972,10 +823,7 @@ const hasPermission = await requestLocationPermission();
       <View style={[styles.logoContainer, { backgroundColor: theme.card }]}>
         <Image source={require('../assets/mmtlogo.png')} style={styles.logoImage} />
       </View>
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} 
-       colors={['#2563eb']}
-            progressBackgroundColor={isDark ? theme.background : '#ffffff'}
-      />}>
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <View style={[styles.header, { backgroundColor: theme.background }]}>
           <View style={styles.profileSection}>
             <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen')}
@@ -1002,7 +850,9 @@ const hasPermission = await requestLocationPermission();
         </View>
 
         <View style={[styles.attendanceSection, { backgroundColor: theme.card }]}>
+          <TouchableOpacity onPress={()=> navigation.navigate ('Homekiroport')}>
           <Text style={styles.sectionTitle}>Today Attendance</Text>
+          </TouchableOpacity>
           <View style={styles.timeCardContainer}>
             <View style={[styles.timeCard, { backgroundColor: theme.background }]}>
               <Text style={[styles.timeCardTitle, { color: theme.text }]}>Check In</Text>
@@ -1438,17 +1288,11 @@ const hasPermission = await requestLocationPermission();
         onRequestClose={() => setBreakModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Start Break</Text>
             <Text style={styles.modalHeading}>Write Break Reason Here</Text>
             <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: theme.card,
-                  color: theme.text,
-                },
-              ]}
+              style={styles.textInput}
               multiline
               placeholder="Break reason here"
               value={breakReason}
@@ -1477,12 +1321,12 @@ const hasPermission = await requestLocationPermission();
         </View>
       </Modal>
 
-       <Modal
+      <Modal
         animationType="none"
         transparent={true}
         visible={customAlert.visible}
         onRequestClose={() =>
-          setCustomAlert({ visible: false, type: 'success', title: '', message: '', isGeofenceAlert: false })
+          setCustomAlert({ visible: false, type: 'success', title: '', message: '' })
         }
       >
         <View style={styles.modalOverlay}>
@@ -1490,31 +1334,21 @@ const hasPermission = await requestLocationPermission();
             style={[
               styles.customAlertContent,
               {
-                backgroundColor: customAlert.type === 'success' ? '#F0FDF4' : '#FFF1F2',
+                backgroundColor: customAlert.type === 'success' ? '#E6FFFA' : '#FFEBEB',
                 transform: [{ scale: scaleAnim }],
               },
             ]}
           >
-            {customAlert.isGeofenceAlert && (
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() =>
-                  setCustomAlert({ visible: false, type: 'success', title: '', message: '', isGeofenceAlert: false })
-                }
-              >
-                <MaterialCommunityIcons name="close" size={24} color="#374151" />
-              </TouchableOpacity>
-            )}
             <MaterialCommunityIcons
               name={customAlert.type === 'success' ? 'check-circle' : 'alert-circle'}
-              size={32}
-              color={customAlert.type === 'success' ? '#16A34A' : '#DC2626'}
-              style={styles.alertIcon}
+              size={40}
+              color={customAlert.type === 'success' ? '#10B981' : '#EF4444'}
+              style={styles.customAlertIcon}
             />
             <Text
               style={[
                 styles.customAlertTitle,
-                { color: customAlert.type === 'success' ? '#16A34A' : '#DC2626' },
+                { color: customAlert.type === 'success' ? '#10B981' : '#EF4444' },
               ]}
             >
               {customAlert.title}
@@ -1524,6 +1358,14 @@ const hasPermission = await requestLocationPermission();
         </View>
       </Modal>
 
+      {/* {datePickerVisible && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )} */}
     </View>
   );
 };
@@ -1656,7 +1498,7 @@ const styles = StyleSheet.create({
     shadowColor: 'rgba(0, 0, 0, 0.5)', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10, alignSelf: 'center'
   },
   modalTitle: {
-    fontSize: 24, fontWeight: '700', marginBottom: 20, color: '#0a74ff', fontFamily: 'System', textAlign: 'center',
+    fontSize: 24, fontWeight: '700', marginBottom: 20, color: '#1E293B', fontFamily: 'System', textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.1)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   modalTitle1: {
@@ -1664,7 +1506,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.1)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   modalHeading: {
-    fontSize: 16, fontWeight: '600', color: '#0a74ff', fontFamily: 'System', marginBottom: 12,
+    fontSize: 16, fontWeight: '600', color: '#1E293B', fontFamily: 'System', marginBottom: 12,
     textShadowColor: 'rgba(0, 0, 0, 0.05)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1,
   },
   requiredAsterisk: {
