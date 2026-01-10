@@ -9,6 +9,9 @@ import MyProfile from './MyProfile'
 import Terms from './Terms'
 import PrivacyPolicy from './PrivacyPolicy'
 import EditProfileScreen from './EditProfileScreen'
+import Ticket from './Ticket'
+import PaySlip from './PaySlip'
+import HRNavigator from '../HRNavigator/HRNavigator'
 
 const Stack = createNativeStackNavigator();
 function MainNavigator() {
@@ -20,11 +23,14 @@ return (
 <Stack.Screen name='IntroScreen' component={IntroScreen} />
 <Stack.Screen name='Login' component={Login} />
 <Stack.Screen name='HomeScreen' component={BottomNavigator} />
+<Stack.Screen name='HomeScree' component={HRNavigator} />
+
 <Stack.Screen name='MyProfile' component={MyProfile} />
 <Stack.Screen name='Terms' component={Terms} />
 <Stack.Screen name='PrivacyPolicy' component={PrivacyPolicy} />
 <Stack.Screen name='EditProfileScreen' component={EditProfileScreen} />
-
+<Stack.Screen name='Ticket' component={Ticket} />
+<Stack.Screen name='PaySlip' component={PaySlip} />
 
 </Stack.Navigator>
 </NavigationContainer>

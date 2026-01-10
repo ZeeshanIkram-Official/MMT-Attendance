@@ -6,13 +6,14 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons'
 import AntDesign from 'react-native-vector-icons/AntDesign'
 import FontAwesome5 from 'react-native-vector-icons/Ionicons'
 
-import HomeScreen from './HomeScreen'
-import Leaves from './Leaves'
-import ProfileScreen from './ProfileScreen'
+import HomeScree from './HomeScree'
+import Leave from './Leave'
+import ProfileScree from './ProfileScree'
+import DashBoar from './DashBoar'
 
 const Tab = createBottomTabNavigator()
 
-const BottomNavigator = ({ navigation }) => {
+const HRNavigator = ({ navigation }) => {
   const isDark = useColorScheme() === 'dark'
   const [modalVisible, setModalVisible] = useState(false)
 
@@ -47,6 +48,7 @@ const BottomNavigator = ({ navigation }) => {
           tabBarIcon: ({ focused, color }) => {
             let iconName, IconComponent
             if (route.name === 'Home') { iconName = 'home'; IconComponent = Entypo }
+            else if (route.name === 'DashBoard') { iconName = 'grid'; IconComponent = Entypo }
             else if (route.name === 'Leaves') { iconName = 'calendar'; IconComponent = Entypo }
             else if (route.name === 'ProfileScreen') { iconName = 'person'; IconComponent = MaterialIcons }
 
@@ -61,9 +63,10 @@ const BottomNavigator = ({ navigation }) => {
           },
         })}
       >
-        <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Leaves" component={Leaves} />
-        <Tab.Screen name="ProfileScreen" component={ProfileScreen} />
+        <Tab.Screen name="DashBoard" component={DashBoar} />
+        <Tab.Screen name="Home" component={HomeScree} />
+        <Tab.Screen name="Leaves" component={Leave} />
+        <Tab.Screen name="ProfileScreen" component={ProfileScree} />
       </Tab.Navigator>
 
       <Modal animationType="fade" transparent visible={modalVisible}>
@@ -154,4 +157,4 @@ const styles = StyleSheet.create({
   modalText: { marginLeft: 12, fontSize: 16, fontWeight: '600' },
 })
 
-export default BottomNavigator
+export default HRNavigator
