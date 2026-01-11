@@ -14,13 +14,32 @@ const SplashScreen = () => {
         const firstLaunch = await AsyncStorage.getItem('isFirstLaunch');
         const token = await AsyncStorage.getItem('authToken');
         const user = await AsyncStorage.getItem('userData');
+        const isCeo =
+          Array.isArray(parsedUser.roles) &&
+          parsedUser.roles.some(
+            role => role.name === 'CEO' || role.name === 'Ceo'
+          );
+
 
         if (!firstLaunch) {
           await AsyncStorage.setItem('isFirstLaunch', 'true');
           navigation.replace('IntroScreen');
         } else if (token && user) {
-          navigation.replace('HomeScreen');
-        } else {
+          const parsedUser = JSON.parse(user);
+
+          const isCeo =
+            Array.isArray(parsedUser.roles) &&
+            parsedUser.roles.some(
+              role => role.name === 'CEO' || role.name === 'Ceo'
+            );
+
+          if (isCeo) {
+            navigation.replace('DashBoard');
+          } else {
+            navigation.replace('HomeScreen');
+          }
+        }
+        else {
           navigation.replace('Login');
         }
       } catch (error) {

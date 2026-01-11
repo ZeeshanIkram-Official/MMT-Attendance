@@ -6,8 +6,6 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons'
 import AntDesign from 'react-native-vector-icons/AntDesign'
 import FontAwesome5 from 'react-native-vector-icons/Ionicons'
 
-import HomeScree from './HomeScree'
-import Leave from './Leave'
 import ProfileScree from './ProfileScree'
 import DashBoard from './DashBoard'
 
@@ -47,7 +45,7 @@ const HRNavigator = ({ navigation }) => {
           tabBarStyle: styles.tabBar,
           tabBarIcon: ({ focused, color }) => {
             let iconName, IconComponent
-            if (route.name === 'Home') { iconName = 'home'; IconComponent = Entypo }
+            if (route.name === 'DashBoard') { iconName = 'grid'; IconComponent = Entypo }
             else if (route.name === 'DashBoard') { iconName = 'grid'; IconComponent = Entypo }
             else if (route.name === 'Leaves') { iconName = 'calendar'; IconComponent = Entypo }
             else if (route.name === 'ProfileScreen') { iconName = 'person'; IconComponent = MaterialIcons }
@@ -64,8 +62,7 @@ const HRNavigator = ({ navigation }) => {
         })}
       >
         <Tab.Screen name="DashBoard" component={DashBoard} />
-        <Tab.Screen name="Home" component={HomeScree} />
-        <Tab.Screen name="Leaves" component={Leave} />
+        
         <Tab.Screen name="ProfileScreen" component={ProfileScree} />
       </Tab.Navigator>
 

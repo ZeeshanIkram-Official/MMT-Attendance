@@ -68,14 +68,26 @@ const Ticket = () => {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <ActivityIndicator size="large" color={theme.button} />
-        <Text style={[styles.loadingText, { color: theme.text }]}>Loading slips...</Text>
+        <View style={styles.loaderWrapper}>
+                <Image
+                  source={require('../assets/only.png')}
+                  style={styles.logo}
+                />
+        
+                <ActivityIndicator
+                  size="large"
+                  color='#0a74ff'
+                  style={styles.loader}
+                />
+              </View>
+        <Text style={styles.loadingText}>Loading slips...</Text>
       </View>
     )
   }
 
   return (
     <ScrollView
+    showsVerticalScrollIndicator={false}
       style={[styles.container, { backgroundColor: theme.background }]}
       refreshControl={
         <RefreshControl
@@ -140,7 +152,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 10, fontSize: 16 },
+  loaderWrapper: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center'},
+  logo: { width: 20, height: 20, resizeMode: 'contain', position: 'absolute', zIndex: 1 },
+  loader: { position: 'absolute',  },
+  loadingText: { marginTop: 8, fontSize: 18, color: '#0a74ff' },
 
   logoContainer: { height: 100, alignItems: 'center', justifyContent: 'center', marginBottom: 10, elevation:4 },
   logoImage: { width: 250, height: 250 },
