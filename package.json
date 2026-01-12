@@ -22,11 +22,13 @@
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-app-intro-slider": "^4.0.4",
+    "react-native-chart-kit": "^6.12.0",
     "react-native-geolocation-service": "^5.3.1",
     "react-native-image-crop-picker": "^0.51.1",
     "react-native-pell-rich-editor": "^1.10.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.19.0",
+    "react-native-svg": "^15.15.1",
     "react-native-vector-icons": "^10.3.0",
     "react-native-vision-camera": "^4.7.3",
     "react-native-webview": "^13.16.0"

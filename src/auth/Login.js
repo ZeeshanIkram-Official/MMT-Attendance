@@ -88,7 +88,7 @@ const Login = ({ navigation }) => {
       if (isHR) {
         navigation.replace('HomeScree');
       } else if (isCeo) {
-        navigation.replace('DashBoard');
+        navigation.replace('Board');
       } else {
         navigation.replace('HomeScreen');
       }

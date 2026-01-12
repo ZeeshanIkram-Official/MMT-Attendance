@@ -14,18 +14,21 @@ const SplashScreen = () => {
         const firstLaunch = await AsyncStorage.getItem('isFirstLaunch');
         const token = await AsyncStorage.getItem('authToken');
         const user = await AsyncStorage.getItem('userData');
-        const isCeo =
-          Array.isArray(parsedUser.roles) &&
-          parsedUser.roles.some(
-            role => role.name === 'CEO' || role.name === 'Ceo'
-          );
-
 
         if (!firstLaunch) {
           await AsyncStorage.setItem('isFirstLaunch', 'true');
           navigation.replace('IntroScreen');
-        } else if (token && user) {
-          const parsedUser = JSON.parse(user);
+          return;
+        }
+
+        if (token && user) {
+          const parsedUser = JSON.parse(user); // parse before using
+
+          const isHR =
+            Array.isArray(parsedUser.roles) &&
+            parsedUser.roles.some(
+              role => role.name === 'HR' || role.name === 'hr'
+            );
 
           const isCeo =
             Array.isArray(parsedUser.roles) &&
@@ -34,14 +37,16 @@ const SplashScreen = () => {
             );
 
           if (isCeo) {
-            navigation.replace('DashBoard');
+            navigation.replace('Board');
+          } else if (isHR) {
+            navigation.replace('HomeScree');
           } else {
             navigation.replace('HomeScreen');
           }
+          return;
         }
-        else {
-          navigation.replace('Login');
-        }
+
+        navigation.replace('Login');
       } catch (error) {
         console.log('❌ Splash Error:', error.message);
         navigation.replace('Login');
@@ -56,13 +61,10 @@ const SplashScreen = () => {
     <View
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#121212' : '#fff' }, // 🔥 dynamic background
+        { backgroundColor: isDark ? '#121212' : '#fff' },
       ]}
     >
-      <Image
-        source={require('../assets/mmtlogo.png')}
-        style={styles.logo}
-      />
+      <Image source={require('../assets/mmtlogo.png')} style={styles.logo} />
     </View>
   );
 };
@@ -70,13 +72,6 @@ const SplashScreen = () => {
 export default SplashScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logo: {
-    height: 500,
-    width: 500,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  logo: { height: 500, width: 500, resizeMode: 'contain' },
 });

@@ -25,7 +25,7 @@ return (
 <Stack.Screen name='Login' component={Login} />
 <Stack.Screen name='HomeScreen' component={BottomNavigator} />
 <Stack.Screen name='HomeScree' component={HRNavigator} />
-<Stack.Screen name='DashBoard' component={CEONavigator} />
+<Stack.Screen name='Board' component={CEONavigator} />
 
 
 <Stack.Screen name='MyProfile' component={MyProfile} />
